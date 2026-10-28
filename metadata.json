@@ -1,0 +1,8 @@
+{
+  "name": "Autonomous AI Agent & Engineering Studio",
+  "description": "Bilingual (MN/EN) Autonomous AI Agent with grounded knowledge retrieval, AST safe calculator, multi-agent planner-executor-verifier workflows, and memory management.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

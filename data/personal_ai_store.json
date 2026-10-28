@@ -1,0 +1,513 @@
+{
+  "activeUserId": "owner",
+  "users": [
+    {
+      "id": "owner",
+      "name": "Би (Owner)",
+      "role": "admin",
+      "email": "tuvshoo0331@gmail.com",
+      "avatarColor": "#8B5CF6"
+    },
+    {
+      "id": "friend",
+      "name": "Найз (Friend)",
+      "role": "user",
+      "email": "friend@personalai.local",
+      "avatarColor": "#EC4899"
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-1",
+      "userId": "owner",
+      "name": "Personal AI Workspace",
+      "tagline": "Memory + Autonomous Agent + Multi-Agent Workspace",
+      "status": "active",
+      "path": "C:\\Users\\enhtv\\Documents\\ai-engineer-course",
+      "description": "Интернеттэй үед найдвартай ажиллаж, дараа нь офлайн горим нэмэх хувийн AI систем.",
+      "createdAt": "2026-10-27T10:00:00Z",
+      "tasks": [
+        {
+          "id": "tsk-1",
+          "title": "Phase 0: Кодын аудит ба хамгаалалт",
+          "status": "verified",
+          "agent": "Reviewer",
+          "progress": 100
+        },
+        {
+          "id": "tsk-2",
+          "title": "Phase 1: Нэгдсэн платформ ба Command Center",
+          "status": "verified",
+          "agent": "Coordinator",
+          "progress": 100
+        },
+        {
+          "id": "tsk-3",
+          "title": "Phase 2: Төв ой санамж ба Memory Galaxy",
+          "status": "in_progress",
+          "agent": "Memory Agent",
+          "progress": 75
+        },
+        {
+          "id": "tsk-4",
+          "title": "Phase 3: Safe Tool Use (AST, Files, Tests)",
+          "status": "verified",
+          "agent": "Tester",
+          "progress": 100
+        },
+        {
+          "id": "tsk-5",
+          "title": "Phase 4: 7-Agent Multi-Agent Workspace",
+          "status": "in_progress",
+          "agent": "Planner",
+          "progress": 60
+        },
+        {
+          "id": "tsk-6",
+          "title": "Phase 5: Mobile ба Responsive Dashboard",
+          "status": "todo",
+          "agent": "Coder",
+          "progress": 20
+        },
+        {
+          "id": "tsk-7",
+          "title": "Phase 6: Өөрийгөө үнэлэх ба сайжруулах",
+          "status": "todo",
+          "agent": "Tester",
+          "progress": 0
+        },
+        {
+          "id": "tsk-8",
+          "title": "Phase 7: Офлайн ажиллагаа (Ollama Local)",
+          "status": "todo",
+          "agent": "Coordinator",
+          "progress": 0
+        }
+      ],
+      "decisions": [
+        {
+          "id": "dec-1",
+          "date": "2026-10-27",
+          "title": "Төвлөрсөн ой санамжийн бүтэц",
+          "rationale": "Бүх агентууд ижил баталгаатай контекстоос мэдээлэл татна."
+        },
+        {
+          "id": "dec-2",
+          "date": "2026-10-27",
+          "title": "Zero eval() AST тооцоолуур",
+          "rationale": "Аюулгүй байдал болон хурд, API зардал хэмнэх локал тооцоолол."
+        },
+        {
+          "id": "dec-3",
+          "date": "2026-10-27",
+          "title": "Бие даасан Tester ба Reviewer",
+          "rationale": "Код бичсэн агент өөрийгөө үнэн гэж үзэхгүй байх зарчим."
+        }
+      ]
+    },
+    {
+      "id": "proj-2",
+      "userId": "owner",
+      "name": "AI Engineering Course & Notes",
+      "tagline": "Python, LLM, Agentic Architecture",
+      "status": "active",
+      "path": "knowledge/ai_engineering_notes.txt",
+      "description": "AI инженерчлэлийн үндсэн ойлголтууд, баримтууд болон судалгааны тэмдэглэл.",
+      "createdAt": "2026-10-25T14:30:00Z",
+      "tasks": [
+        {
+          "id": "tsk-201",
+          "title": "LLM Function calling ба эрсдэлийн хяналт",
+          "status": "verified",
+          "agent": "Researcher",
+          "progress": 100
+        },
+        {
+          "id": "tsk-202",
+          "title": "Grounded document reading тест",
+          "status": "verified",
+          "agent": "Tester",
+          "progress": 100
+        }
+      ],
+      "decisions": [
+        {
+          "id": "dec-201",
+          "date": "2026-10-25",
+          "title": "knowledge/ хавтаснаас гадагш хандахыг хориглох",
+          "rationale": "Path traversal эрсдэлийг хаасан."
+        }
+      ]
+    }
+  ],
+  "memories": [
+    {
+      "id": "mem-1",
+      "userId": "owner",
+      "category": "preference",
+      "title": "Харилцааны үндсэн хэл",
+      "content": "Монгол хэлээр найрсаг, тодорхой, эх сурвалжтай харилцах. Шаардлагатай үед Англи болон Япон хэлээр ажиллана.",
+      "importance": "high",
+      "tags": [
+        "language",
+        "mongolian",
+        "preference"
+      ],
+      "connections": [
+        "mem-2",
+        "mem-5"
+      ],
+      "updatedAt": "2026-10-27T22:00:00Z"
+    },
+    {
+      "id": "mem-2",
+      "userId": "owner",
+      "category": "goal",
+      "title": "Personal AI алсын хараа",
+      "content": "ChatGPT шиг энгийн чат биш; төсөл санадаг, даалгавар гүйцэтгэдэг, олон агентаар баталгаажуулдаг систем бүтээх.",
+      "importance": "high",
+      "tags": [
+        "vision",
+        "master-blueprint",
+        "personal-ai"
+      ],
+      "connections": [
+        "mem-1",
+        "mem-3",
+        "mem-4"
+      ],
+      "updatedAt": "2026-10-27T22:30:00Z"
+    },
+    {
+      "id": "mem-3",
+      "userId": "owner",
+      "category": "technical_decision",
+      "title": "Компьютерийн нөөц ба орчин",
+      "content": "Windows 11, 16 GB RAM, NVIDIA GPU. Python 3.13 + Node.js 22. .venv орчин.",
+      "importance": "medium",
+      "tags": [
+        "windows",
+        "gpu",
+        "environment"
+      ],
+      "connections": [
+        "mem-2",
+        "mem-4"
+      ],
+      "updatedAt": "2026-10-27T21:15:00Z"
+    },
+    {
+      "id": "mem-4",
+      "userId": "owner",
+      "category": "technical_decision",
+      "title": "Safe AST Calculator дүрэм",
+      "content": "Локал Python/TypeScript AST ашиглана, eval() хэзээ ч хэрэглэхгүй. Үр дүн: PASS.",
+      "importance": "high",
+      "tags": [
+        "security",
+        "calculator",
+        "ast",
+        "safety"
+      ],
+      "connections": [
+        "mem-2",
+        "mem-3",
+        "mem-6"
+      ],
+      "updatedAt": "2026-10-27T23:10:00Z"
+    },
+    {
+      "id": "mem-5",
+      "userId": "owner",
+      "category": "knowledge_note",
+      "title": "Obsidian & Local Notes холбоос",
+      "content": "knowledge/ хавтас дахь тэмдэглэлүүд болон судалгааны баримтуудад батлагдсан эх сурвалжтай хандана.",
+      "importance": "medium",
+      "tags": [
+        "obsidian",
+        "knowledge",
+        "notes"
+      ],
+      "connections": [
+        "mem-1",
+        "mem-6"
+      ],
+      "updatedAt": "2026-10-27T23:20:00Z"
+    },
+    {
+      "id": "mem-6",
+      "userId": "owner",
+      "category": "error_solution",
+      "title": "Path Traversal аюулгүй байдал",
+      "content": "../ai_memory.db зэрэг замаар хавтаснаас гарах оролдлогыг хатуу хориглож шалгадаг.",
+      "importance": "high",
+      "tags": [
+        "security",
+        "path-traversal",
+        "tested"
+      ],
+      "connections": [
+        "mem-4",
+        "mem-5"
+      ],
+      "updatedAt": "2026-10-27T23:35:00Z"
+    }
+  ],
+  "agents": [
+    {
+      "id": "planner",
+      "name": "Planner",
+      "role": "Төлөвлөгч",
+      "description": "Даалгаврыг үе шатаар хувааж, эрсдэлийг тодорхойлно.",
+      "model": "gemini-3.8-flash",
+      "status": "idle",
+      "color": "#A855F7",
+      "icon": "Compass"
+    },
+    {
+      "id": "researcher",
+      "name": "Researcher",
+      "role": "Судлаач",
+      "description": "Мэдээлэл хайж, эх сурвалжийг баримтаар шалгана.",
+      "model": "gemini-3.8-flash",
+      "status": "idle",
+      "color": "#38BDF8",
+      "icon": "Search"
+    },
+    {
+      "id": "coder",
+      "name": "Coder",
+      "role": "Хөгжүүлэгч",
+      "description": "Код бичих, архитектур шийдэх, засварлах.",
+      "model": "gemini-3.8-flash",
+      "status": "idle",
+      "color": "#10B981",
+      "icon": "Code"
+    },
+    {
+      "id": "reviewer",
+      "name": "Reviewer",
+      "role": "Шүүмжлэгч",
+      "description": "Код болон шийдлийг шүүмжлэх, таамаглалыг шалгах.",
+      "model": "gemini-3.8-flash",
+      "status": "idle",
+      "color": "#F59E0B",
+      "icon": "ShieldAlert"
+    },
+    {
+      "id": "tester",
+      "name": "Tester",
+      "role": "Тестлэгч",
+      "description": "Тест ажиллуулах, алдаа, цоорхойг илрүүлэх.",
+      "model": "gemini-3.8-flash",
+      "status": "idle",
+      "color": "#EC4899",
+      "icon": "CheckCheck"
+    },
+    {
+      "id": "memory",
+      "name": "Memory Agent",
+      "role": "Санах ой",
+      "description": "Мэдээллийг хадгалах, хуучирсан мэдээллийг таних.",
+      "model": "gemini-3.8-flash",
+      "status": "active",
+      "color": "#6366F1",
+      "icon": "Brain"
+    },
+    {
+      "id": "coordinator",
+      "name": "Coordinator",
+      "role": "Зохицуулагч",
+      "description": "Агентуудын ажлыг нэгтгэж, эцсийн үр дүнг хэрэглэгчид өгнө.",
+      "model": "gemini-3.8-flash",
+      "status": "active",
+      "color": "#F43F5E",
+      "icon": "Cpu"
+    }
+  ],
+  "activities": [
+    {
+      "id": "act-1793173348244-8352",
+      "timestamp": "2026-10-28T07:42:28.244Z",
+      "agent": "Tester",
+      "action": "RUN_TESTS",
+      "target": "Acceptance Suite",
+      "status": "PASS",
+      "details": "4/4 tests passed"
+    },
+    {
+      "id": "act-1793173323525-vq1y",
+      "timestamp": "2026-10-28T07:42:03.525Z",
+      "agent": "Coordinator",
+      "action": "INSPECT_PROJECT",
+      "target": "Personal AI Workspace",
+      "status": "PASS",
+      "details": "Inspected 8 tasks"
+    },
+    {
+      "id": "act-1793173273017-8n0b",
+      "timestamp": "2026-10-28T07:41:13.017Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793173119973-seyz",
+      "timestamp": "2026-10-28T07:38:39.973Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793173012020-y0pd",
+      "timestamp": "2026-10-28T07:36:52.020Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172678824-l8h4",
+      "timestamp": "2026-10-28T07:31:18.824Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172620063-6fd5",
+      "timestamp": "2026-10-28T07:30:20.063Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172550152-jmfn",
+      "timestamp": "2026-10-28T07:29:10.152Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172457073-gwxg",
+      "timestamp": "2026-10-28T07:27:37.073Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172423814-bfd7",
+      "timestamp": "2026-10-28T07:27:03.814Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172344847-0n5i",
+      "timestamp": "2026-10-28T07:25:44.847Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172292361-hduf",
+      "timestamp": "2026-10-28T07:24:52.361Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172217271-zhpi",
+      "timestamp": "2026-10-28T07:23:37.271Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172038541-2q1l",
+      "timestamp": "2026-10-28T07:20:38.541Z",
+      "agent": "Tester",
+      "action": "CALCULATE_AST",
+      "target": "1250*24+3600",
+      "status": "PASS",
+      "details": "Computed 33,600"
+    },
+    {
+      "id": "act-1793172011358-ur70",
+      "timestamp": "2026-10-28T07:20:11.358Z",
+      "agent": "Coordinator",
+      "action": "GREETING",
+      "target": "User interaction",
+      "status": "PASS",
+      "details": "Conversational greeting returned"
+    },
+    {
+      "id": "act-1",
+      "timestamp": "2026-10-27T23:55:00Z",
+      "agent": "Tester",
+      "action": "RUN_TEST_SUITE",
+      "target": "7 Acceptance Checks",
+      "status": "PASS",
+      "details": "All 7 acceptance tests passed 100%"
+    },
+    {
+      "id": "act-2",
+      "timestamp": "2026-10-27T23:45:00Z",
+      "agent": "Coordinator",
+      "action": "AUDIT_SYSTEM",
+      "target": "Personal AI Blueprint",
+      "status": "PASS",
+      "details": "Phase 0 audit complete; safe AST calculator & memory verified"
+    },
+    {
+      "id": "act-3",
+      "timestamp": "2026-10-27T23:30:00Z",
+      "agent": "Memory Agent",
+      "action": "SYNC_MEMORY_VAULT",
+      "target": "knowledge/ai_engineering_notes.txt",
+      "status": "PASS",
+      "details": "Indexed 6 core engineering principles"
+    },
+    {
+      "id": "act-4",
+      "timestamp": "2026-10-27T23:15:00Z",
+      "agent": "Reviewer",
+      "action": "SECURITY_AUDIT",
+      "target": "Path Traversal Guard",
+      "status": "PASS",
+      "details": "Blocked ../ traversal attempt cleanly"
+    }
+  ],
+  "settings": {
+    "primaryModel": "gemini-3.8-flash",
+    "fallbackModel": "gemini-3.1-flash-lite",
+    "offlineMode": false,
+    "autoReview": true,
+    "maxFileBytes": 500000,
+    "monthlyBudgetUSD": 20,
+    "spentBudgetUSD": 1.45,
+    "voiceEnabled": true,
+    "voiceLanguage": "mn-MN",
+    "strictVerification": true
+  }
+}
