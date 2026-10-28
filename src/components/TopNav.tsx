@@ -75,6 +75,14 @@ export const TopNav: React.FC<TopNavProps> = ({
         ? 'Search 1261 Omi memories + your Obsidian vault.'
         : 'Search 1261 Omi memories + your Obsidian vault.',
     },
+    workspace: {
+      roman: 'XVI.',
+      section: 'WORKSPACE · SAFE CODING WORKTREE',
+      title: isMn ? 'Coding Workspace' : isJa ? 'セーフワークスペース' : 'Coding Workspace',
+      subtitle: isMn
+        ? 'Тусгаарласан Git worktree, нэгдсэн unified diff, авто-тестүүд ба хүний зөвшөөрөл [ACCEPT / REFINE].'
+        : 'Isolated Git worktree, live unified diff viewer, sandboxed test runs, and explicit human approval.',
+    },
     activity: {
       roman: 'VI.',
       section: 'SELF · PIPELINE',

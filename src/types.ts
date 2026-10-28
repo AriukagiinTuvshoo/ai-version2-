@@ -1,5 +1,5 @@
 export type LanguageMode = 'auto' | 'mn' | 'en' | 'ja';
-export type ViewTab = 'home' | 'chat' | 'projects' | 'agents' | 'memory' | 'activity' | 'settings' | 'diagnostics';
+export type ViewTab = 'home' | 'chat' | 'projects' | 'agents' | 'memory' | 'workspace' | 'activity' | 'settings' | 'diagnostics' | 'graph';
 
 export interface UserProfile {
   id: string;
@@ -190,3 +190,170 @@ export interface AcceptanceTestSuiteResponse {
   passed: number;
   results: AcceptanceTestResult[];
 }
+
+export interface WorkspacePlanItem {
+  id: string;
+  title: string;
+  status: 'pending' | 'in_progress' | 'completed';
+}
+
+export interface WorkspaceTestResult {
+  command: string;
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+  durationMs: number;
+  passed: boolean;
+  executedAt: string;
+}
+
+export interface WorkspaceDiffHunkLine {
+  type: 'context' | 'addition' | 'deletion';
+  content: string;
+  oldLineNo?: number;
+  newLineNo?: number;
+}
+
+export interface WorkspaceDiffHunk {
+  oldStart: number;
+  oldLines: number;
+  newStart: number;
+  newLines: number;
+  header: string;
+  lines: WorkspaceDiffHunkLine[];
+}
+
+export interface WorkspaceDiffFile {
+  file: string;
+  oldPath?: string;
+  newPath?: string;
+  status: 'modified' | 'added' | 'deleted' | 'renamed';
+  additions: number;
+  deletions: number;
+  hunks: WorkspaceDiffHunk[];
+}
+
+export interface WorkspaceDetails {
+  taskId: string;
+  title: string;
+  baseBranch: string;
+  branch: string;
+  worktreePath: string;
+  status: 'CREATED' | 'EDITED' | 'TESTS_RUNNING' | 'TESTS_PASSED' | 'TESTS_FAILED' | 'NEEDS_APPROVAL' | 'ACCEPTED' | 'DISCARDED';
+  createdAt: string;
+  updatedAt: string;
+  actor: string;
+  instructions?: string;
+  plan: WorkspacePlanItem[];
+  changedFiles: string[];
+  rawDiff: string;
+  parsedDiff: WorkspaceDiffFile[];
+  testResults?: WorkspaceTestResult;
+  approvalDecision?: 'PENDING' | 'ACCEPTED' | 'REFINED' | 'DISCARDED';
+  baseCommitAtCreation: string;
+}
+
+export interface WorkspaceAuditEntry {
+  id: string;
+  taskId: string;
+  actor: string;
+  timestamp: string;
+  action: 'CREATE' | 'INSPECT' | 'APPLY_PATCH' | 'RUN_TESTS' | 'REFINE' | 'ACCEPT' | 'DISCARD';
+  worktreePath: string;
+  branch: string;
+  baseBranch: string;
+  changedFiles: string[];
+  testCommand?: string;
+  testExitCode?: number;
+  approvalDecision: 'PENDING' | 'ACCEPTED' | 'REFINED' | 'DISCARDED';
+  details?: string;
+}
+
+// Executive Dashboard Types (Reference image_ac866cb8.png)
+export interface DashboardEmailItem {
+  id: string;
+  sender: string;
+  senderEmail: string;
+  subject: string;
+  time: string;
+  unread: boolean;
+  priority: 'high' | 'normal' | 'low';
+  summarySnippet: string;
+}
+
+export interface DashboardCalendarEvent {
+  id: string;
+  time: string;
+  endTime: string;
+  title: string;
+  category: 'planning' | 'architecture' | 'review' | 'pairing';
+  color: string;
+}
+
+export interface DashboardAutomation {
+  id: string;
+  title: string;
+  schedule: string;
+  status: 'active' | 'paused';
+  icon: string;
+  lastRun?: string;
+  nextRun?: string;
+}
+
+export interface DashboardFocusItem {
+  id: string;
+  title: string;
+  completed: boolean;
+  category: string;
+}
+
+export interface DashboardOverviewData {
+  greeting: string;
+  subtitle: string;
+  focusScore: number;
+  unreadEmailCount: number;
+  emailAiSummary: string;
+  emails: DashboardEmailItem[];
+  calendarEvents: DashboardCalendarEvent[];
+  researchBrief: {
+    title: string;
+    date: string;
+    summary: string;
+    bullets: string[];
+  };
+  automations: DashboardAutomation[];
+  focusItems: DashboardFocusItem[];
+}
+
+// Knowledge Graph & Communities Types (Reference image_4d64129a.png)
+export interface KnowledgeGraphNode {
+  id: string;
+  label: string;
+  category: string;
+  communityId: number;
+  communityColor: string;
+  pageRank: number;
+  degree: number;
+  depth: number;
+  x?: number;
+  y?: number;
+  vx?: number;
+  vy?: number;
+}
+
+export interface KnowledgeGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  strength: number;
+}
+
+export interface KnowledgeGraphCommunity {
+  id: number;
+  name: string;
+  color: string;
+  nodeCount: number;
+  summary: string;
+}
+

@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   User,
   CheckCircle2,
+  Code2,
 } from 'lucide-react';
 import { ViewTab, UserProfile } from '../types';
 
@@ -104,6 +105,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <Brain className={`h-4 w-4 ${activeTab === 'agents' ? 'text-purple-400' : 'text-slate-500'}`} />
             <span>{isMn ? 'AI Agent Mastermind' : 'AI Agent Mastermind'}</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('workspace')}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition ${
+              activeTab === 'workspace'
+                ? 'bg-[#1e1730] text-white shadow-sm shadow-purple-500/10'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-[#140e22]'
+            }`}
+          >
+            <Code2 className={`h-4 w-4 ${activeTab === 'workspace' ? 'text-amber-400' : 'text-slate-500'}`} />
+            <div className="flex items-center justify-between w-full">
+              <span>{isMn ? 'Coding Workspace' : 'Coding Workspace'}</span>
+              <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono">GIT</span>
+            </div>
           </button>
 
           <button

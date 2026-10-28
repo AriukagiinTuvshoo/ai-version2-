@@ -9,6 +9,7 @@ import { AgentsView } from './views/AgentsView';
 import { MemoryView } from './views/MemoryView';
 import { ActivityView } from './views/ActivityView';
 import { SettingsView } from './views/SettingsView';
+import { CodingWorkspaceView } from './views/CodingWorkspaceView';
 import { DiagnosticsTestSuite } from './components/DiagnosticsTestSuite';
 import { ViewTab, UserProfile } from './types';
 
@@ -132,6 +133,8 @@ export default function App() {
               onRunQueryWithFile={handleRunQueryWithFile}
             />
           )}
+
+          {activeTab === 'workspace' && <CodingWorkspaceView uiLang={uiLang} />}
 
           {activeTab === 'activity' && <ActivityView uiLang={uiLang} />}
 
