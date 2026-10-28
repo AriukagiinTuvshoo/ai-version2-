@@ -1,0 +1,231 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "_comment": "Documented schema & template for Personal AI store. Copy to personal_ai_store.json for local runtime use.",
+  "activeUserId": "owner",
+  "users": [
+    {
+      "id": "owner",
+      "name": "Би (Owner)",
+      "role": "admin",
+      "email": "owner@personalai.local",
+      "avatarColor": "#8B5CF6"
+    },
+    {
+      "id": "friend",
+      "name": "Найз (Friend)",
+      "role": "user",
+      "email": "friend@personalai.local",
+      "avatarColor": "#EC4899"
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-1",
+      "userId": "owner",
+      "name": "Personal AI Workspace",
+      "tagline": "Memory + Autonomous Agent + Multi-Agent Workspace",
+      "status": "active",
+      "path": "workspace/ai-engineering-core",
+      "description": "Интернеттэй үед найдвартай ажиллаж, дараа нь офлайн горим нэмэх хувийн AI систем.",
+      "createdAt": "2026-10-27T10:00:00Z",
+      "tasks": [
+        {
+          "id": "tsk-1",
+          "title": "Phase 0: Кодын аудит ба хамгаалалт",
+          "status": "verified",
+          "agent": "Reviewer",
+          "progress": 100
+        },
+        {
+          "id": "tsk-2",
+          "title": "Phase 1: Нэгдсэн платформ ба Command Center",
+          "status": "verified",
+          "agent": "Coordinator",
+          "progress": 100
+        },
+        {
+          "id": "tsk-3",
+          "title": "Phase 2: Төв ой санамж ба Memory Galaxy",
+          "status": "in_progress",
+          "agent": "Memory Agent",
+          "progress": 75
+        },
+        {
+          "id": "tsk-4",
+          "title": "Phase 3: Safe Tool Use (AST, Files, Tests)",
+          "status": "verified",
+          "agent": "Tester",
+          "progress": 100
+        },
+        {
+          "id": "tsk-5",
+          "title": "Phase 4: 7-Agent Multi-Agent Workspace",
+          "status": "in_progress",
+          "agent": "Planner",
+          "progress": 60
+        },
+        {
+          "id": "tsk-6",
+          "title": "Phase 5: Mobile ба Responsive Dashboard",
+          "status": "todo",
+          "agent": "Coder",
+          "progress": 20
+        },
+        {
+          "id": "tsk-7",
+          "title": "Phase 6: Өөрийгөө үнэлэх ба сайжруулах",
+          "status": "todo",
+          "agent": "Tester",
+          "progress": 0
+        },
+        {
+          "id": "tsk-8",
+          "title": "Phase 7: Офлайн ажиллагаа (Ollama Local)",
+          "status": "todo",
+          "agent": "Coordinator",
+          "progress": 0
+        }
+      ],
+      "decisions": [
+        {
+          "id": "dec-1",
+          "date": "2026-10-27",
+          "title": "Төвлөрсөн ой санамжийн бүтэц",
+          "rationale": "Бүх агентууд ижил баталгаатай контекстоос мэдээлэл татна."
+        },
+        {
+          "id": "dec-2",
+          "date": "2026-10-27",
+          "title": "Zero eval() AST тооцоолуур",
+          "rationale": "Аюулгүй байдал болон хурд, API зардал хэмнэх локал тооцоолол."
+        },
+        {
+          "id": "dec-3",
+          "date": "2026-10-27",
+          "title": "Бие даасан Tester ба Reviewer",
+          "rationale": "Код бичсэн агент өөрийгөө үнэн гэж үзэхгүй байх зарчим."
+        }
+      ]
+    },
+    {
+      "id": "proj-2",
+      "userId": "owner",
+      "name": "AI Engineering Course & Notes",
+      "tagline": "Python, LLM, Agentic Architecture",
+      "status": "active",
+      "path": "knowledge/ai_engineering_notes.txt",
+      "description": "AI инженерчлэлийн үндсэн ойлголтууд, баримтууд болон судалгааны тэмдэглэл.",
+      "createdAt": "2026-10-25T14:30:00Z",
+      "tasks": [
+        {
+          "id": "tsk-201",
+          "title": "LLM Function calling ба эрсдэлийн хяналт",
+          "status": "verified",
+          "agent": "Researcher",
+          "progress": 100
+        },
+        {
+          "id": "tsk-202",
+          "title": "Grounded document reading тест",
+          "status": "verified",
+          "agent": "Tester",
+          "progress": 100
+        }
+      ],
+      "decisions": [
+        {
+          "id": "dec-201",
+          "date": "2026-10-25",
+          "title": "knowledge/ хавтаснаас гадагш хандахыг хориглох",
+          "rationale": "Path traversal эрсдэлийг хаасан."
+        }
+      ]
+    }
+  ],
+  "memories": [
+    {
+      "id": "mem-1",
+      "userId": "owner",
+      "category": "preference",
+      "title": "Харилцааны үндсэн хэл",
+      "content": "Монгол хэлээр найрсаг, тодорхой, эх сурвалжтай харилцах. Шаардлагатай үед Англи болон Япон хэлээр ажиллана.",
+      "importance": "high",
+      "tags": ["language", "mongolian", "preference"],
+      "connections": ["mem-2", "mem-5"],
+      "updatedAt": "2026-10-27T22:00:00Z"
+    },
+    {
+      "id": "mem-2",
+      "userId": "owner",
+      "category": "goal",
+      "title": "Personal AI алсын хараа",
+      "content": "ChatGPT шиг энгийн чат биш; төсөл санадаг, даалгавар гүйцэтгэдэг, олон агентаар баталгаажуулдаг систем бүтээх.",
+      "importance": "high",
+      "tags": ["vision", "master-blueprint", "personal-ai"],
+      "connections": ["mem-1", "mem-3", "mem-4"],
+      "updatedAt": "2026-10-27T22:30:00Z"
+    },
+    {
+      "id": "mem-3",
+      "userId": "owner",
+      "category": "technical_decision",
+      "title": "Компьютерийн нөөц ба орчин",
+      "content": "Windows 11, 16 GB RAM, NVIDIA GPU. Python 3.13 + Node.js 22. .venv орчин.",
+      "importance": "medium",
+      "tags": ["windows", "gpu", "environment"],
+      "connections": ["mem-2", "mem-4"],
+      "updatedAt": "2026-10-27T21:15:00Z"
+    },
+    {
+      "id": "mem-4",
+      "userId": "owner",
+      "category": "technical_decision",
+      "title": "Safe AST Calculator дүрэм",
+      "content": "Локал Python/TypeScript AST ашиглана, eval() хэзээ ч хэрэглэхгүй. Үр дүн: PASS.",
+      "importance": "high",
+      "tags": ["security", "calculator", "ast", "safety"],
+      "connections": ["mem-2", "mem-3", "mem-6"],
+      "updatedAt": "2026-10-27T23:10:00Z"
+    },
+    {
+      "id": "mem-5",
+      "userId": "owner",
+      "category": "knowledge_note",
+      "title": "Obsidian & Local Notes холбоос",
+      "content": "knowledge/ хавтас дахь тэмдэглэлүүд болон судалгааны баримтуудад батлагдсан эх сурвалжтай хандана.",
+      "importance": "medium",
+      "tags": ["obsidian", "knowledge", "notes"],
+      "connections": ["mem-1", "mem-6"],
+      "updatedAt": "2026-10-27T23:20:00Z"
+    },
+    {
+      "id": "mem-6",
+      "userId": "owner",
+      "category": "error_solution",
+      "title": "Path Traversal аюулгүй байдал",
+      "content": "../ai_memory.db зэрэг замаар хавтаснаас гарах оролдлогыг хатуу хориглож шалгадаг.",
+      "importance": "high",
+      "tags": ["security", "path-traversal", "tested"],
+      "connections": ["mem-4", "mem-5"],
+      "updatedAt": "2026-10-27T23:35:00Z"
+    }
+  ],
+  "agents": [
+    { "id": "agt-1", name: "Coordinator", role: "Шийдвэр гаргагч ба диспетчер", color: "#6366F1", active: true },
+    { "id": "agt-2", name: "Planner", role: "Төлөвлөгч ба үе шатуудад хуваагч", color: "#3B82F6", active: true },
+    { "id": "agt-3", name: "Researcher", role: "Судалгаа ба баримт шалгагч", color: "#10B981", active: true },
+    { "id": "agt-4", name: "Coder", role: "Код бичигч ба засварлагч", color: "#F59E0B", active: true },
+    { "id": "agt-5", name: "Reviewer", role: "Код болон үр дүн хянагч", color: "#EC4899", active: true },
+    { "id": "agt-6", name: "Tester", role: "Аюулгүй байдал ба тест ажиллуулагч", color: "#EF4444", active: true },
+    { "id": "agt-7", name: "Memory Agent", role: "Төв ой санамжийн индексжүүлэлт", color: "#8B5CF6", active: true }
+  ],
+  "activities": [],
+  "settings": {
+    "offlineMode": false,
+    "model": "gemini-2.5-flash",
+    "dailyBudget": 5.0,
+    "currentSpend": 0.42,
+    "isolationLevel": "strict",
+    "allowAutoExecution": false
+  }
+}

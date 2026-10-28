@@ -99,6 +99,14 @@ export const TopNav: React.FC<TopNavProps> = ({
         ? 'README болон test_autonomous_agent_v4.py файлын 7 хүлээн авах шалгуурын бодит шалгалт.'
         : 'Live verification of the 7 safety rules, AST parser math, and traversal guards.',
     },
+    graph: {
+      roman: 'XVII.',
+      section: 'MEMORY · KNOWLEDGE GRAPH',
+      title: isMn ? 'Knowledge Graph' : isJa ? 'ナレッジグラフ' : 'Knowledge Graph',
+      subtitle: isMn
+        ? 'Санах ой ба мэдлэгийн кластеруудын интерактив график дүрслэл.'
+        : 'Interactive graph visualization of memory nodes, clusters, and conceptual relationships.',
+    },
     settings: {
       roman: 'VIII.',
       section: 'SYSTEM · CONFIGURATION',

@@ -553,6 +553,18 @@ export class WorkspaceService {
       throw new Error(`Security Exception: File path "${relativeFilePath}" escapes worktree.`);
     }
 
+    // Strict symlink escape guard
+    if (fs.existsSync(safeTargetPath)) {
+      const lstat = fs.lstatSync(safeTargetPath);
+      if (lstat.isSymbolicLink()) {
+        const realTarget = fs.realpathSync(safeTargetPath);
+        const realWorktree = fs.realpathSync(worktreePath);
+        if (!realTarget.startsWith(realWorktree + path.sep) && realTarget !== realWorktree) {
+          throw new Error(`Security Exception: Symlink escape detected for "${relativeFilePath}".`);
+        }
+      }
+    }
+
     const targetDir = path.dirname(safeTargetPath);
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });

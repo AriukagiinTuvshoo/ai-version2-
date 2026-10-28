@@ -18,7 +18,7 @@ export default function App() {
   const [uiLang, setUiLang] = useState<'mn' | 'en' | 'ja'>('mn');
   const [activeUser, setActiveUser] = useState<string>('owner');
   const [users, setUsers] = useState<UserProfile[]>([
-    { id: 'owner', name: 'Би (Owner)', role: 'admin', email: 'tuvshoo0331@gmail.com', avatarColor: '#8B5CF6' },
+    { id: 'owner', name: 'Би (Owner)', role: 'admin', email: 'owner@personalai.local', avatarColor: '#8B5CF6' },
     { id: 'friend', name: 'Найз (Friend)', role: 'user', email: 'friend@personalai.local', avatarColor: '#EC4899' },
   ]);
   const [offlineMode, setOfflineMode] = useState<boolean>(false);

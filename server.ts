@@ -21,6 +21,7 @@ const DATA_DIR = path.resolve(__dirname, 'data');
 const KNOWLEDGE_DIR = path.resolve(__dirname, 'knowledge');
 const REPORTS_DIR = path.resolve(__dirname, 'reports');
 const STORE_FILE = path.resolve(DATA_DIR, 'personal_ai_store.json');
+const STORE_EXAMPLE_FILE = path.resolve(DATA_DIR, 'personal_ai_store.example.json');
 
 // Ensure directories exist
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -42,7 +43,7 @@ function getInitialStore() {
   return {
     activeUserId: 'owner',
     users: [
-      { id: 'owner', name: 'Би (Owner)', role: 'admin', email: 'tuvshoo0331@gmail.com', avatarColor: '#8B5CF6' },
+      { id: 'owner', name: 'Би (Owner)', role: 'admin', email: 'owner@personalai.local', avatarColor: '#8B5CF6' },
       { id: 'friend', name: 'Найз (Friend)', role: 'user', email: 'friend@personalai.local', avatarColor: '#EC4899' },
     ],
     projects: [
@@ -52,7 +53,7 @@ function getInitialStore() {
         name: 'Personal AI Workspace',
         tagline: 'Memory + Autonomous Agent + Multi-Agent Workspace',
         status: 'active',
-        path: 'C:\\Users\\enhtv\\Documents\\ai-engineer-course',
+        path: 'workspace/ai-engineering-core',
         description: 'Интернеттэй үед найдвартай ажиллаж, дараа нь офлайн горим нэмэх хувийн AI систем.',
         createdAt: '2026-10-27T10:00:00Z',
         tasks: [
@@ -190,6 +191,17 @@ function getInitialStore() {
 
 function loadStore() {
   if (!fs.existsSync(STORE_FILE)) {
+    if (fs.existsSync(STORE_EXAMPLE_FILE)) {
+      try {
+        const exampleData = JSON.parse(fs.readFileSync(STORE_EXAMPLE_FILE, 'utf-8'));
+        delete exampleData.$schema;
+        delete exampleData._comment;
+        fs.writeFileSync(STORE_FILE, JSON.stringify(exampleData, null, 2), 'utf-8');
+        return exampleData;
+      } catch (_) {
+        // fallback
+      }
+    }
     const initial = getInitialStore();
     fs.writeFileSync(STORE_FILE, JSON.stringify(initial, null, 2), 'utf-8');
     return initial;
@@ -777,10 +789,166 @@ export async function executeAutonomousAssistantTask(
   };
 }
 
+// ==================== AUTHENTICATION & SESSION MANAGEMENT (P0 SECURITY) ====================
+
+export interface SessionData {
+  userId: string;
+  role: 'admin' | 'user';
+  token: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+export const SERVER_SESSION_SECRET = process.env.WORKSPACE_AUTH_TOKEN || 'ws-token-' + Date.now().toString(36);
+export const activeSessions = new Map<string, SessionData>();
+
+// Register default owner token
+activeSessions.set(SERVER_SESSION_SECRET, {
+  userId: 'owner',
+  role: 'admin',
+  token: SERVER_SESSION_SECRET,
+  createdAt: Date.now(),
+  expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+});
+
+export function getSessionFromRequest(req: express.Request): SessionData | null {
+  let token: string | undefined;
+
+  const authHeader = req.headers['authorization'];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.slice(7).trim();
+  } else if (req.headers['x-workspace-token']) {
+    token = (req.headers['x-workspace-token'] as string).trim();
+  } else if (req.headers['cookie']) {
+    const match = req.headers['cookie'].match(/(?:^|;\s*)ai_session_token=([^;]+)/);
+    if (match) token = decodeURIComponent(match[1]).trim();
+  }
+
+  if (!token) return null;
+
+  const session = activeSessions.get(token);
+  if (session) {
+    if (session.expiresAt && session.expiresAt < Date.now()) {
+      activeSessions.delete(token);
+      return null;
+    }
+    return session;
+  }
+
+  if (token === SERVER_SESSION_SECRET) {
+    return {
+      userId: 'owner',
+      role: 'admin',
+      token: SERVER_SESSION_SECRET,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+    };
+  }
+
+  return null;
+}
+
+export function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const session = getSessionFromRequest(req);
+  if (!session) {
+    return res.status(401).json({
+      error: 'UNAUTHORIZED: Valid session or Bearer token required.',
+      code: 'AUTH_REQUIRED',
+    });
+  }
+  (req as any).user = session;
+  (req as any).workspaceUser = session;
+  next();
+}
+
+export function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  requireAuth(req, res, () => {
+    const user = (req as any).user;
+    if (user.role !== 'admin') {
+      return res.status(403).json({
+        error: 'FORBIDDEN: Admin privileges required.',
+        code: 'FORBIDDEN',
+      });
+    }
+    next();
+  });
+}
+
+// Alias for backwards compatibility with milestone 1 workspace routes
+export const requireWorkspaceAuth = requireAuth;
+
+// ==================== AUTH & SESSION ROUTES ====================
+
+// 1. Session verification endpoint (strictly protected: never leaks token without auth)
+app.get('/api/auth/session', requireAuth, (req, res) => {
+  const user = (req as any).user;
+  res.json({
+    authenticated: true,
+    userId: user.userId,
+    role: user.role,
+    environment: 'isolated-worktree',
+  });
+});
+
+// 2. Authentication Login endpoint
+app.post('/api/auth/login', (req, res) => {
+  const { token, password, userId } = req.body || {};
+  const provided = (token || password || '').trim();
+
+  const adminPass = process.env.ADMIN_PASSWORD || 'personal-ai-master';
+  const isValidMaster = provided && (provided === SERVER_SESSION_SECRET || provided === adminPass);
+
+  if (!isValidMaster) {
+    return res.status(401).json({
+      ok: false,
+      error: 'INVALID_CREDENTIALS: Incorrect token or password.',
+    });
+  }
+
+  const sessionToken = `sess-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
+  const targetUser = userId || 'owner';
+  const role = targetUser === 'friend' ? 'user' : 'admin';
+
+  const newSession: SessionData = {
+    userId: targetUser,
+    role,
+    token: sessionToken,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+  };
+
+  activeSessions.set(sessionToken, newSession);
+
+  res.cookie('ai_session_token', sessionToken, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  res.json({
+    ok: true,
+    token: sessionToken,
+    user: {
+      id: targetUser,
+      role,
+    },
+  });
+});
+
+// 3. Logout endpoint
+app.post('/api/auth/logout', (req, res) => {
+  const session = getSessionFromRequest(req);
+  if (session && session.token !== SERVER_SESSION_SECRET) {
+    activeSessions.delete(session.token);
+  }
+  res.clearCookie('ai_session_token');
+  res.json({ ok: true, message: 'Logged out successfully' });
+});
+
 // ==================== API ROUTES ====================
 
 // 1. Unified Autonomous Agent Run Endpoint
-app.post('/api/agent/run', async (req, res) => {
+app.post('/api/agent/run', requireAuth, async (req, res) => {
   try {
     const { user_text, language_override, multi_agent } = req.body;
     if (!user_text || typeof user_text !== 'string') {
@@ -801,7 +969,7 @@ app.post('/api/agent/run', async (req, res) => {
 });
 
 // 2. Direct Tool Execution API (for explicit client tool invocations)
-app.post('/api/tools/execute', async (req, res) => {
+app.post('/api/tools/execute', requireAuth, async (req, res) => {
   try {
     const { toolName, params } = req.body;
     if (!toolName) return res.status(400).json({ error: 'toolName is required' });
@@ -850,16 +1018,23 @@ app.get('/api/store', (_req, res) => {
   res.json(loadStore());
 });
 
-app.post('/api/store/switch-user', (req, res) => {
+app.post('/api/store/switch-user', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const { userId } = req.body;
   const store = loadStore();
-  if (store.users.some((u: any) => u.id === userId)) {
-    store.activeUserId = userId;
-    saveStore(store);
-    logActivity('Coordinator', 'SWITCH_USER', `Switched to user: ${userId}`, 'PASS', `Active user changed to ${userId}`);
-    return res.json({ success: true, activeUserId: userId });
+  if (!store.users.some((u: any) => u.id === userId)) {
+    return res.status(400).json({ error: 'User not found' });
   }
-  res.status(400).json({ error: 'User not found' });
+
+  // Authorization check: non-admins cannot switch to other identities
+  if (currentUser.role !== 'admin' && currentUser.userId !== userId) {
+    return res.status(403).json({ error: 'FORBIDDEN: Admin permissions required to switch user context.' });
+  }
+
+  store.activeUserId = userId;
+  saveStore(store);
+  logActivity('Coordinator', 'SWITCH_USER', `Switched to user: ${userId}`, 'PASS', `Active user changed to ${userId}`);
+  return res.json({ success: true, activeUserId: userId });
 });
 
 // 4. Projects & Tasks
@@ -871,13 +1046,14 @@ app.get('/api/projects', (_req, res) => {
   res.json(userProjects);
 });
 
-app.post('/api/projects', (req, res) => {
+app.post('/api/projects', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const { name, tagline, description, path: projPath } = req.body;
   if (!name) return res.status(400).json({ error: 'Project name is required' });
   const store = loadStore();
   const newProj = {
     id: `proj-${Date.now()}`,
-    userId: store.activeUserId,
+    userId: currentUser?.userId || store.activeUserId,
     name,
     tagline: tagline || '',
     description: description || '',
@@ -893,7 +1069,7 @@ app.post('/api/projects', (req, res) => {
   res.json({ success: true, project: newProj });
 });
 
-app.post('/api/projects/:id/tasks', (req, res) => {
+app.post('/api/projects/:id/tasks', requireAuth, (req, res) => {
   const { title, agent } = req.body;
   if (!title) return res.status(400).json({ error: 'Task title is required' });
   const store = loadStore();
@@ -914,7 +1090,7 @@ app.post('/api/projects/:id/tasks', (req, res) => {
   res.json({ success: true, task: newTask });
 });
 
-app.patch('/api/projects/:projId/tasks/:taskId', (req, res) => {
+app.patch('/api/projects/:projId/tasks/:taskId', requireAuth, (req, res) => {
   const { status, progress } = req.body;
   const store = loadStore();
   const proj = store.projects.find((p: any) => p.id === req.params.projId);
@@ -929,7 +1105,7 @@ app.patch('/api/projects/:projId/tasks/:taskId', (req, res) => {
   res.json({ success: true, task });
 });
 
-app.post('/api/projects/:id/decisions', (req, res) => {
+app.post('/api/projects/:id/decisions', requireAuth, (req, res) => {
   const { title, rationale } = req.body;
   const store = loadStore();
   const proj = store.projects.find((p: any) => p.id === req.params.id);
@@ -961,13 +1137,14 @@ app.get('/api/memory/vault', (_req, res) => {
   });
 });
 
-app.post('/api/memory/vault', (req, res) => {
+app.post('/api/memory/vault', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const { title, content, category, tags, importance } = req.body;
   if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
   const store = loadStore();
   const newMem = {
     id: `mem-${Date.now()}`,
-    userId: store.activeUserId,
+    userId: currentUser?.userId || store.activeUserId,
     category: category || 'preference',
     title,
     content,
@@ -982,8 +1159,13 @@ app.post('/api/memory/vault', (req, res) => {
   res.json({ success: true, memory: newMem });
 });
 
-app.delete('/api/memory/vault/:id', (req, res) => {
+app.delete('/api/memory/vault/:id', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const store = loadStore();
+  const existing = store.memories.find((m: any) => m.id === req.params.id);
+  if (existing && currentUser.role !== 'admin' && existing.userId !== currentUser.userId) {
+    return res.status(403).json({ error: 'FORBIDDEN: You cannot delete another user\'s memory.' });
+  }
   store.memories = store.memories.filter((m: any) => m.id !== req.params.id);
   saveStore(store);
   logActivity('Memory Agent', 'DELETE_MEMORY', req.params.id, 'PASS', `Removed memory node ${req.params.id}`);
@@ -1668,56 +1850,7 @@ app.get('/api/memory/knowledge-graph-v2', (req, res) => {
 const REPO_ROOT = path.resolve(__dirname);
 const workspaceService = new WorkspaceService(REPO_ROOT);
 
-// Privileged local authentication tokens
-const SERVER_SESSION_SECRET = process.env.WORKSPACE_AUTH_TOKEN || 'ws-token-' + Date.now().toString(36);
-const activeWorkspaceSessions = new Map<string, { userId: string; role: 'admin' | 'user'; token: string }>();
 
-// Register default owner token
-activeWorkspaceSessions.set(SERVER_SESSION_SECRET, {
-  userId: 'owner',
-  role: 'admin',
-  token: SERVER_SESSION_SECRET,
-});
-
-/**
- * Authentication & Authorization middleware for privileged workspace operations.
- * Strictly verifies Bearer token / X-Workspace-Token and rejects unauthenticated callers.
- */
-function requireWorkspaceAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const authHeader = req.headers['authorization'];
-  const customHeader = req.headers['x-workspace-token'] as string;
-  let token = customHeader;
-
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    token = authHeader.slice(7).trim();
-  }
-
-  if (!token) {
-    return res.status(401).json({
-      error: 'UNAUTHORIZED: Missing workspace authorization token. Privileged operations require Bearer token.',
-    });
-  }
-
-  const session = activeWorkspaceSessions.get(token);
-  if (!session && token !== SERVER_SESSION_SECRET) {
-    return res.status(403).json({
-      error: 'FORBIDDEN: Invalid or expired workspace session token.',
-    });
-  }
-
-  (req as any).workspaceUser = session || { userId: 'owner', role: 'admin', token };
-  next();
-}
-
-// 1. Session handshake endpoint for authenticated UI
-app.get('/api/auth/session', (_req, res) => {
-  res.json({
-    token: SERVER_SESSION_SECRET,
-    userId: 'owner',
-    role: 'admin',
-    environment: 'isolated-worktree',
-  });
-});
 
 // 2. List all workspaces
 app.get('/api/workspace', requireWorkspaceAuth, (_req, res) => {

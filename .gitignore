@@ -9,3 +9,11 @@ node_modules/
 dist/
 build/
 .worktrees/
+
+# Runtime storage & sensitive personal data
+data/*.json
+!data/personal_ai_store.example.json
+data/*.db
+data/logs/
+*.log
+.playwright-cli/
