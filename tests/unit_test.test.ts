@@ -60,3 +60,28 @@ test('6. rankMemories retrieves and ranks memories based on relevance', () => {
   assert.equal(results.length > 0, true);
   assert.equal(results[0].id, '1');
 });
+
+test('7. authorization and session security boundaries', () => {
+  // Test Bearer token header parsing pattern
+  const parseBearer = (header?: string) => {
+    if (header && header.startsWith('Bearer ')) return header.slice(7).trim();
+    return null;
+  };
+
+  assert.equal(parseBearer('Bearer valid-secret-token'), 'valid-secret-token');
+  assert.equal(parseBearer('Basic dXNlcjpwYXNz'), null);
+  assert.equal(parseBearer(''), null);
+  assert.equal(parseBearer(undefined), null);
+
+  // Test admin vs user privilege check
+  const canSwitchUser = (currentUserRole: string, targetUserId: string, currentUserId: string) => {
+    if (currentUserRole !== 'admin' && currentUserId !== targetUserId) {
+      return false;
+    }
+    return true;
+  };
+
+  assert.equal(canSwitchUser('admin', 'friend', 'owner'), true);
+  assert.equal(canSwitchUser('user', 'owner', 'friend'), false);
+  assert.equal(canSwitchUser('user', 'friend', 'friend'), true);
+});

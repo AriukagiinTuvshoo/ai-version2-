@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { AgentResponse, ConversationTurn, LanguageMode } from '../types';
+import { apiFetch } from '../lib/auth';
 
 interface AgentConsoleProps {
   uiLang: 'mn' | 'en';
@@ -218,7 +219,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({
     setIsLoading(true);
 
     try {
-      const res = await fetch('/api/agent/run', {
+      const res = await apiFetch('/api/agent/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -260,7 +261,7 @@ export const AgentConsole: React.FC<AgentConsoleProps> = ({
   const saveReport = async (turn: ConversationTurn) => {
     setSavingReportId(turn.id);
     try {
-      const res = await fetch('/api/reports', {
+      const res = await apiFetch('/api/reports', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

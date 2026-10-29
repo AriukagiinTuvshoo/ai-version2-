@@ -2,6 +2,7 @@ import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import path from 'path';
 import fs from 'fs';
+import { execSync } from 'node:child_process';
 import {
   validateTaskId,
   resolveSafeWorktreePath,
@@ -13,6 +14,13 @@ describe('Safe Autonomous Coding Workspace (Milestone 1)', () => {
   const repoRoot = process.cwd();
   let workspaceService: WorkspaceService;
   const testTaskId = `test-worktree-${Date.now()}`;
+  const currentBranch = (() => {
+    try {
+      return execSync('git rev-parse --abbrev-ref HEAD', { encoding: 'utf-8' }).trim() || 'main';
+    } catch {
+      return 'main';
+    }
+  })();
 
   before(async () => {
     workspaceService = new WorkspaceService(repoRoot);
@@ -85,7 +93,7 @@ index 1111111..2222222 100644
       const created = await workspaceService.createWorkspace({
         taskId: testTaskId,
         title: 'Increase Safe Engine Test Coverage',
-        baseBranch: 'main',
+        baseBranch: currentBranch,
         actor: 'test-runner',
       });
 
@@ -135,8 +143,14 @@ index 1111111..2222222 100644
       assert.ok(actions.includes('RUN_TESTS'));
     });
 
-    test('discards isolated worktree and cleans up feature branch', async () => {
-      const result = await workspaceService.discardWorkspace(testTaskId, 'test-cleanup');
+    test('refuses discard if unmerged commits exist unless force is specified', async () => {
+      // Guard refusal test
+      await assert.rejects(async () => {
+        await workspaceService.discardWorkspace(testTaskId, 'test-cleanup');
+      }, /unmerged commits exist/);
+
+      // Explicit force discard test
+      const result = await workspaceService.discardWorkspace(testTaskId, 'test-cleanup', { force: true });
       assert.strictEqual(result.success, true);
 
       const expectedPath = path.resolve(repoRoot, '.worktrees', testTaskId);
@@ -148,7 +162,7 @@ index 1111111..2222222 100644
       await workspaceService.createWorkspace({
         taskId: acceptTaskId,
         title: 'Acceptance merge test',
-        baseBranch: 'main',
+        baseBranch: currentBranch,
         actor: 'reviewer-test',
       });
 

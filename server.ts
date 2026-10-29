@@ -799,17 +799,19 @@ export interface SessionData {
   expiresAt: number;
 }
 
-export const SERVER_SESSION_SECRET = process.env.WORKSPACE_AUTH_TOKEN || 'ws-token-' + Date.now().toString(36);
+export const SERVER_SESSION_SECRET = process.env.WORKSPACE_AUTH_TOKEN || '';
 export const activeSessions = new Map<string, SessionData>();
 
-// Register default owner token
-activeSessions.set(SERVER_SESSION_SECRET, {
-  userId: 'owner',
-  role: 'admin',
-  token: SERVER_SESSION_SECRET,
-  createdAt: Date.now(),
-  expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
-});
+// Register machine token only if explicitly configured via WORKSPACE_AUTH_TOKEN
+if (SERVER_SESSION_SECRET) {
+  activeSessions.set(SERVER_SESSION_SECRET, {
+    userId: 'owner',
+    role: 'admin',
+    token: SERVER_SESSION_SECRET,
+    createdAt: Date.now(),
+    expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+  });
+}
 
 export function getSessionFromRequest(req: express.Request): SessionData | null {
   let token: string | undefined;
@@ -835,7 +837,7 @@ export function getSessionFromRequest(req: express.Request): SessionData | null 
     return session;
   }
 
-  if (token === SERVER_SESSION_SECRET) {
+  if (SERVER_SESSION_SECRET && token === SERVER_SESSION_SECRET) {
     return {
       userId: 'owner',
       role: 'admin',
@@ -874,8 +876,8 @@ export function requireAdmin(req: express.Request, res: express.Response, next: 
   });
 }
 
-// Alias for backwards compatibility with milestone 1 workspace routes
-export const requireWorkspaceAuth = requireAuth;
+// Workspace operations require verified admin/owner privileges
+export const requireWorkspaceAuth = requireAdmin;
 
 // ==================== AUTH & SESSION ROUTES ====================
 
@@ -892,26 +894,36 @@ app.get('/api/auth/session', requireAuth, (req, res) => {
 
 // 2. Authentication Login endpoint
 app.post('/api/auth/login', (req, res) => {
-  const { token, password, userId } = req.body || {};
-  const provided = (token || password || '').trim();
+  const { password, token } = req.body || {};
+  const provided = (password || token || '').trim();
 
-  const adminPass = process.env.ADMIN_PASSWORD || 'personal-ai-master';
-  const isValidMaster = provided && (provided === SERVER_SESSION_SECRET || provided === adminPass);
+  const adminPass = process.env.ADMIN_PASSWORD;
+  if (!adminPass) {
+    return res.status(503).json({
+      ok: false,
+      error: 'SERVER_MISCONFIGURED: ADMIN_PASSWORD environment variable is not configured on the server. Logins are disabled.',
+    });
+  }
 
-  if (!isValidMaster) {
+  // Identity and role derived strictly from verified server-side credentials
+  let authenticatedUser: { id: string; role: 'admin' | 'user' } | null = null;
+  if (provided === adminPass) {
+    authenticatedUser = { id: 'owner', role: 'admin' };
+  } else if (process.env.FRIEND_PASSWORD && provided === process.env.FRIEND_PASSWORD) {
+    authenticatedUser = { id: 'friend', role: 'user' };
+  }
+
+  if (!authenticatedUser) {
     return res.status(401).json({
       ok: false,
-      error: 'INVALID_CREDENTIALS: Incorrect token or password.',
+      error: 'INVALID_CREDENTIALS: Incorrect credentials.',
     });
   }
 
   const sessionToken = `sess-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
-  const targetUser = userId || 'owner';
-  const role = targetUser === 'friend' ? 'user' : 'admin';
-
   const newSession: SessionData = {
-    userId: targetUser,
-    role,
+    userId: authenticatedUser.id,
+    role: authenticatedUser.role,
     token: sessionToken,
     createdAt: Date.now(),
     expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
@@ -925,12 +937,12 @@ app.post('/api/auth/login', (req, res) => {
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
+  // Never return session tokens in response body
   res.json({
     ok: true,
-    token: sessionToken,
     user: {
-      id: targetUser,
-      role,
+      id: authenticatedUser.id,
+      role: authenticatedUser.role,
     },
   });
 });
@@ -1014,21 +1026,32 @@ app.post('/api/tools/execute', requireAuth, async (req, res) => {
 });
 
 // 3. Store & Users
-app.get('/api/store', (_req, res) => {
-  res.json(loadStore());
+app.get('/api/store', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
+  const store = loadStore();
+  if (currentUser.role !== 'admin') {
+    const sanitizedUsers = store.users.map((u: any) => ({
+      ...u,
+      email: u.id === currentUser.userId ? u.email : '[MASKED]',
+    }));
+    return res.json({
+      activeUserId: currentUser.userId,
+      users: sanitizedUsers,
+      projects: store.projects.filter((p: any) => p.userId === currentUser.userId),
+      memories: store.memories.filter((m: any) => m.userId === currentUser.userId),
+      agents: store.agents,
+      activities: [],
+      settings: { offlineMode: store.settings.offlineMode },
+    });
+  }
+  res.json(store);
 });
 
-app.post('/api/store/switch-user', requireAuth, (req, res) => {
-  const currentUser = (req as any).user;
+app.post('/api/store/switch-user', requireAdmin, (req, res) => {
   const { userId } = req.body;
   const store = loadStore();
   if (!store.users.some((u: any) => u.id === userId)) {
     return res.status(400).json({ error: 'User not found' });
-  }
-
-  // Authorization check: non-admins cannot switch to other identities
-  if (currentUser.role !== 'admin' && currentUser.userId !== userId) {
-    return res.status(403).json({ error: 'FORBIDDEN: Admin permissions required to switch user context.' });
   }
 
   store.activeUserId = userId;
@@ -1038,11 +1061,12 @@ app.post('/api/store/switch-user', requireAuth, (req, res) => {
 });
 
 // 4. Projects & Tasks
-app.get('/api/projects', (_req, res) => {
+app.get('/api/projects', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const store = loadStore();
-  const userProjects = store.projects.filter(
-    (p: any) => p.userId === store.activeUserId || store.activeUserId === 'owner'
-  );
+  const userProjects = currentUser.role === 'admin'
+    ? store.projects
+    : store.projects.filter((p: any) => p.userId === currentUser.userId);
   res.json(userProjects);
 });
 
@@ -1053,7 +1077,7 @@ app.post('/api/projects', requireAuth, (req, res) => {
   const store = loadStore();
   const newProj = {
     id: `proj-${Date.now()}`,
-    userId: currentUser?.userId || store.activeUserId,
+    userId: currentUser.userId,
     name,
     tagline: tagline || '',
     description: description || '',
@@ -1070,11 +1094,15 @@ app.post('/api/projects', requireAuth, (req, res) => {
 });
 
 app.post('/api/projects/:id/tasks', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const { title, agent } = req.body;
   if (!title) return res.status(400).json({ error: 'Task title is required' });
   const store = loadStore();
   const proj = store.projects.find((p: any) => p.id === req.params.id);
   if (!proj) return res.status(404).json({ error: 'Project not found' });
+  if (currentUser.role !== 'admin' && proj.userId !== currentUser.userId) {
+    return res.status(403).json({ error: 'FORBIDDEN: You do not have permission to modify this project.' });
+  }
 
   const newTask = {
     id: `tsk-${Date.now()}`,
@@ -1091,10 +1119,14 @@ app.post('/api/projects/:id/tasks', requireAuth, (req, res) => {
 });
 
 app.patch('/api/projects/:projId/tasks/:taskId', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const { status, progress } = req.body;
   const store = loadStore();
   const proj = store.projects.find((p: any) => p.id === req.params.projId);
   if (!proj) return res.status(404).json({ error: 'Project not found' });
+  if (currentUser.role !== 'admin' && proj.userId !== currentUser.userId) {
+    return res.status(403).json({ error: 'FORBIDDEN: You do not have permission to modify this project.' });
+  }
   const task = proj.tasks.find((t: any) => t.id === req.params.taskId);
   if (!task) return res.status(404).json({ error: 'Task not found' });
 
@@ -1106,10 +1138,14 @@ app.patch('/api/projects/:projId/tasks/:taskId', requireAuth, (req, res) => {
 });
 
 app.post('/api/projects/:id/decisions', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const { title, rationale } = req.body;
   const store = loadStore();
   const proj = store.projects.find((p: any) => p.id === req.params.id);
   if (!proj) return res.status(404).json({ error: 'Project not found' });
+  if (currentUser.role !== 'admin' && proj.userId !== currentUser.userId) {
+    return res.status(403).json({ error: 'FORBIDDEN: You do not have permission to modify this project.' });
+  }
   const newDec = {
     id: `dec-${Date.now()}`,
     date: new Date().toISOString().slice(0, 10),
@@ -1123,11 +1159,12 @@ app.post('/api/projects/:id/decisions', requireAuth, (req, res) => {
 });
 
 // 5. Memory Vault & Interactive Galaxy Graph
-app.get('/api/memory/vault', (_req, res) => {
+app.get('/api/memory/vault', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const store = loadStore();
-  const userMems = store.memories.filter(
-    (m: any) => m.userId === store.activeUserId || store.activeUserId === 'owner'
-  );
+  const userMems = currentUser.role === 'admin'
+    ? store.memories
+    : store.memories.filter((m: any) => m.userId === currentUser.userId);
   const knowledgeFiles = listKnowledgeFiles();
   res.json({
     totalMemories: userMems.length,
@@ -1144,7 +1181,7 @@ app.post('/api/memory/vault', requireAuth, (req, res) => {
   const store = loadStore();
   const newMem = {
     id: `mem-${Date.now()}`,
-    userId: currentUser?.userId || store.activeUserId,
+    userId: currentUser.userId,
     category: category || 'preference',
     title,
     content,
@@ -1172,11 +1209,35 @@ app.delete('/api/memory/vault/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
-app.get('/api/memory/galaxy-graph', (_req, res) => {
+app.put('/api/memory/vault/:id', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
   const store = loadStore();
-  const userMems = store.memories.filter(
-    (m: any) => m.userId === store.activeUserId || store.activeUserId === 'owner'
-  );
+  const existing = store.memories.find((m: any) => m.id === req.params.id);
+  if (!existing) {
+    return res.status(404).json({ error: 'Memory item not found.' });
+  }
+  if (currentUser.role !== 'admin' && existing.userId !== currentUser.userId) {
+    return res.status(403).json({ error: 'FORBIDDEN: You cannot edit another user\'s memory.' });
+  }
+  const { title, content, category, importance, tags } = req.body;
+  if (title !== undefined) existing.title = title;
+  if (content !== undefined) existing.content = content;
+  if (category !== undefined) existing.category = category;
+  if (importance !== undefined) existing.importance = importance;
+  if (tags !== undefined) existing.tags = tags;
+  existing.updatedAt = new Date().toISOString();
+
+  saveStore(store);
+  logActivity('Memory Agent', 'UPDATE_MEMORY', existing.title, 'PASS', `Updated memory node ${existing.id}`);
+  res.json({ success: true, memory: existing });
+});
+
+app.get('/api/memory/galaxy-graph', requireAuth, (req, res) => {
+  const currentUser = (req as any).user;
+  const store = loadStore();
+  const userMems = currentUser.role === 'admin'
+    ? store.memories
+    : store.memories.filter((m: any) => m.userId === currentUser.userId);
 
   const nodes = userMems.map((m: any, idx: number) => {
     const theta = (idx / userMems.length) * 2 * Math.PI;
@@ -1245,12 +1306,12 @@ app.get('/api/memory/galaxy-graph', (_req, res) => {
 });
 
 // 6. Agents Roster & Pipeline
-app.get('/api/agents', (_req, res) => {
+app.get('/api/agents', requireAuth, (_req, res) => {
   const store = loadStore();
   res.json(store.agents);
 });
 
-app.post('/api/agents/pipeline', async (req, res) => {
+app.post('/api/agents/pipeline', requireAuth, async (req, res) => {
   try {
     const { goal, language_override } = req.body;
     if (!goal) return res.status(400).json({ error: 'Goal is required' });
@@ -1269,7 +1330,7 @@ app.post('/api/agents/pipeline', async (req, res) => {
 });
 
 // 7. Knowledge Files API
-app.get('/api/knowledge', (_req, res) => {
+app.get('/api/knowledge', requireAuth, (_req, res) => {
   try {
     const files = listKnowledgeFiles();
     const result = files.map((name) => {
@@ -1289,7 +1350,7 @@ app.get('/api/knowledge', (_req, res) => {
   }
 });
 
-app.post('/api/knowledge', (req, res) => {
+app.post('/api/knowledge', requireAdmin, (req, res) => {
   try {
     const { filename, content } = req.body;
     if (!filename || typeof filename !== 'string') {
@@ -1305,7 +1366,7 @@ app.post('/api/knowledge', (req, res) => {
 });
 
 // 8. Reports API
-app.get('/api/reports', (_req, res) => {
+app.get('/api/reports', requireAuth, (_req, res) => {
   try {
     if (!fs.existsSync(REPORTS_DIR)) return res.json([]);
     const files = fs
@@ -1329,7 +1390,7 @@ app.get('/api/reports', (_req, res) => {
   }
 });
 
-app.post('/api/reports', (req, res) => {
+app.post('/api/reports', requireAuth, (req, res) => {
   try {
     const { user_text, answer, model, status } = req.body;
     const now = new Date();
@@ -1357,12 +1418,12 @@ app.post('/api/reports', (req, res) => {
 });
 
 // 9. Activity Log & Settings
-app.get('/api/activity', (_req, res) => {
+app.get('/api/activity', requireAuth, (_req, res) => {
   const store = loadStore();
   res.json(store.activities || []);
 });
 
-app.post('/api/settings', (req, res) => {
+app.post('/api/settings', requireAdmin, (req, res) => {
   const store = loadStore();
   store.settings = { ...store.settings, ...req.body };
   saveStore(store);
@@ -1587,7 +1648,7 @@ let dashboardState = {
   ],
 };
 
-app.get('/api/dashboard/overview', (_req, res) => {
+app.get('/api/dashboard/overview', requireAuth, (_req, res) => {
   const completedCount = dashboardState.focusItems.filter(f => f.completed).length;
   const focusScore = Math.round((completedCount / dashboardState.focusItems.length) * 100);
 
@@ -1662,7 +1723,7 @@ app.get('/api/dashboard/overview', (_req, res) => {
   res.json(overview);
 });
 
-app.patch('/api/dashboard/focus/:id', (req, res) => {
+app.patch('/api/dashboard/focus/:id', requireAuth, (req, res) => {
   const { id } = req.params;
   const item = dashboardState.focusItems.find(f => f.id === id);
   if (!item) return res.status(404).json({ error: 'Item not found' });
@@ -1673,7 +1734,7 @@ app.patch('/api/dashboard/focus/:id', (req, res) => {
   res.json({ success: true, item, focusScore });
 });
 
-app.post('/api/dashboard/automations/:id/trigger', (req, res) => {
+app.post('/api/dashboard/automations/:id/trigger', requireAdmin, (req, res) => {
   const { id } = req.params;
   const auto = dashboardState.automations.find(a => a.id === id);
   if (!auto) return res.status(404).json({ error: 'Automation not found' });
@@ -1684,7 +1745,7 @@ app.post('/api/dashboard/automations/:id/trigger', (req, res) => {
 
 // ==================== KNOWLEDGE GRAPH V2 (REFERENCE image_4d64129a.png) ====================
 
-app.get('/api/memory/knowledge-graph-v2', (req, res) => {
+app.get('/api/memory/knowledge-graph-v2', requireAuth, (req, res) => {
   const resolution = parseFloat(req.query.resolution as string) || 1.0;
 
   // 67 Rich Nodes matching image_4d64129a.png
@@ -1980,7 +2041,8 @@ app.post('/api/workspace/:taskId/discard', requireWorkspaceAuth, async (req, res
   try {
     const { taskId } = req.params;
     const actor = (req as any).workspaceUser?.userId || 'authorized-reviewer';
-    const result = await workspaceService.discardWorkspace(taskId, actor);
+    const force = Boolean(req.body?.force);
+    const result = await workspaceService.discardWorkspace(taskId, actor, { force });
 
     logActivity('Reviewer', 'WORKTREE_DISCARD', `Discarded task: ${taskId}`, 'PASS', result.message);
     res.json(result);
@@ -2025,6 +2087,10 @@ async function startServer() {
   });
 }
 
-startServer().catch((err) => {
-  console.error('Failed to start server:', err);
-});
+export { app, startServer };
+
+if (process.env.NODE_ENV !== 'test') {
+  startServer().catch((err) => {
+    console.error('Failed to start server:', err);
+  });
+}

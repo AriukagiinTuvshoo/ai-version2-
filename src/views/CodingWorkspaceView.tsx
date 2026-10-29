@@ -6,6 +6,7 @@ import {
   WorkspacePlanItem,
 } from '../types';
 import { UnifiedDiffViewer } from '../components/UnifiedDiffViewer';
+import { ensureAuth, getAuthToken } from '../lib/auth';
 import {
   GitBranch,
   Terminal,
@@ -66,13 +67,14 @@ export const CodingWorkspaceView: React.FC<CodingWorkspaceViewProps> = ({ uiLang
     async function initialize() {
       try {
         setIsLoading(true);
-        const authRes = await fetch('/api/auth/session');
-        const authData = await authRes.json();
-        const token = authData.token;
+        await ensureAuth();
+        const token = getAuthToken();
         setAuthToken(token);
 
         // Fetch workspaces
-        await refreshWorkspaces(token);
+        if (token) {
+          await refreshWorkspaces(token);
+        }
       } catch (err: any) {
         console.error('Session handshake failed:', err);
         setActionMessage({ type: 'error', text: 'Auth session handshake failed: ' + err.message });

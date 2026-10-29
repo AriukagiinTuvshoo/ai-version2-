@@ -788,12 +788,43 @@ export class WorkspaceService {
 
   /**
    * Discards the isolated worktree safely without modifying the primary branch.
+   * Guard: Refuses to delete if uncommitted work or unmerged commits exist unless explicit force authorization is provided.
    */
-  public async discardWorkspace(taskId: string, actor: string = 'authorized-reviewer'): Promise<{ success: boolean; message: string }> {
+  public async discardWorkspace(
+    taskId: string,
+    actor: string = 'authorized-reviewer',
+    options?: { force?: boolean }
+  ): Promise<{ success: boolean; message: string }> {
     const workspace = this.tasks.get(taskId);
     if (!workspace) throw new Error(`Workspace for task "${taskId}" not found.`);
 
     const worktreePath = resolveSafeWorktreePath(this.repoRoot, taskId);
+
+    // Guard: Check for uncommitted work in the worktree
+    if (fs.existsSync(worktreePath)) {
+      const statusRes = await spawnSecureProcess('git', ['status', '--porcelain'], { cwd: worktreePath });
+      if (statusRes.exitCode === 0 && statusRes.stdout.trim().length > 0) {
+        if (!options?.force) {
+          throw new Error(
+            `Refusing to force-remove worktree for task "${taskId}": uncommitted changes exist in "${worktreePath}". Commit, stash, or provide explicit force authorization.`
+          );
+        }
+      }
+    }
+
+    // Guard: Check for unmerged commits on the feature branch compared to base branch
+    if (!options?.force) {
+      const logRes = await spawnSecureProcess(
+        'git',
+        ['log', `${workspace.baseBranch}..${workspace.branch}`, '--oneline'],
+        { cwd: this.repoRoot }
+      );
+      if (logRes.exitCode === 0 && logRes.stdout.trim().length > 0) {
+        throw new Error(
+          `Refusing to force-delete branch "${workspace.branch}": unmerged commits exist. Merge into ${workspace.baseBranch} or provide explicit force authorization.`
+        );
+      }
+    }
 
     // Remove worktree
     await spawnSecureProcess('git', ['worktree', 'remove', '--force', worktreePath], { cwd: this.repoRoot });
