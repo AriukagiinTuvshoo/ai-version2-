@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
@@ -11,10 +12,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
-const HOST = '0.0.0.0';
+const PORT = parseInt(process.env.PORT || '3000', 10);
+const HOST = process.env.HOST || '0.0.0.0';
+const isProd = process.env.NODE_ENV === 'production';
 
-app.use(cors());
+// Basic security headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(self), geolocation=()');
+  next();
+});
+
+// Hardened CORS: allow credentials, echo origin
+app.use(cors({
+  origin: true,
+  credentials: true,
+}));
 app.use(express.json({ limit: '15mb' }));
 
 const DATA_DIR = path.resolve(__dirname, 'data');
@@ -892,8 +908,44 @@ app.get('/api/auth/session', requireAuth, (req, res) => {
   });
 });
 
+// Rate Limiting Map for /api/auth/login
+interface RateLimitRecord {
+  attempts: number;
+  lockedUntil: number;
+}
+export const loginRateLimiter = new Map<string, RateLimitRecord>();
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// Constant-time password comparison to prevent timing attacks
+export function safeTimingCompare(userInput: string, secretValue?: string): boolean {
+  if (!userInput || !secretValue) return false;
+  const hashA = crypto.createHash('sha256').update(userInput).digest();
+  const hashB = crypto.createHash('sha256').update(secretValue).digest();
+  return crypto.timingSafeEqual(hashA, hashB);
+}
+
 // 2. Authentication Login endpoint
 app.post('/api/auth/login', (req, res) => {
+  const clientIp =
+    (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
+    req.socket.remoteAddress ||
+    '127.0.0.1';
+
+  const now = Date.now();
+  const rateRecord = loginRateLimiter.get(clientIp);
+
+  // Check rate limit lockout
+  if (rateRecord && rateRecord.lockedUntil > now) {
+    const remainingMinutes = Math.ceil((rateRecord.lockedUntil - now) / 60000);
+    return res.status(429).json({
+      ok: false,
+      error: `RATE_LIMITED: Too many failed login attempts. Temporarily locked. Please try again in ${remainingMinutes} minute(s).`,
+      code: 'RATE_LIMITED',
+    });
+  }
+
   const { password, token } = req.body || {};
   const provided = (password || token || '').trim();
 
@@ -902,39 +954,61 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(503).json({
       ok: false,
       error: 'SERVER_MISCONFIGURED: ADMIN_PASSWORD environment variable is not configured on the server. Logins are disabled.',
+      code: 'SERVER_MISCONFIGURED',
     });
   }
 
-  // Identity and role derived strictly from verified server-side credentials
+  // Identity and role derived strictly from verified server-side credentials using constant-time comparison
   let authenticatedUser: { id: string; role: 'admin' | 'user' } | null = null;
-  if (provided === adminPass) {
+  if (safeTimingCompare(provided, adminPass)) {
     authenticatedUser = { id: 'owner', role: 'admin' };
-  } else if (process.env.FRIEND_PASSWORD && provided === process.env.FRIEND_PASSWORD) {
+  } else if (process.env.FRIEND_PASSWORD && safeTimingCompare(provided, process.env.FRIEND_PASSWORD)) {
     authenticatedUser = { id: 'friend', role: 'user' };
   }
 
   if (!authenticatedUser) {
+    const attempts = (rateRecord?.attempts || 0) + 1;
+    const isLocked = attempts >= MAX_FAILED_ATTEMPTS;
+    loginRateLimiter.set(clientIp, {
+      attempts,
+      lockedUntil: isLocked ? now + LOCKOUT_DURATION_MS : 0,
+    });
+
+    if (isLocked) {
+      return res.status(429).json({
+        ok: false,
+        error: 'RATE_LIMITED: Too many failed login attempts. Account temporarily locked for 15 minutes.',
+        code: 'RATE_LIMITED',
+      });
+    }
+
     return res.status(401).json({
       ok: false,
       error: 'INVALID_CREDENTIALS: Incorrect credentials.',
+      code: 'INVALID_CREDENTIALS',
     });
   }
+
+  // Clear failed attempt record on successful login
+  loginRateLimiter.delete(clientIp);
 
   const sessionToken = `sess-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 10)}`;
   const newSession: SessionData = {
     userId: authenticatedUser.id,
     role: authenticatedUser.role,
     token: sessionToken,
-    createdAt: Date.now(),
-    expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000,
+    createdAt: now,
+    expiresAt: now + SESSION_TTL_MS,
   };
 
   activeSessions.set(sessionToken, newSession);
 
+  // Set secure, httpOnly, sameSite lax cookie
   res.cookie('ai_session_token', sessionToken, {
     httpOnly: true,
     sameSite: 'lax',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    secure: isProd,
+    maxAge: SESSION_TTL_MS,
   });
 
   // Never return session tokens in response body
@@ -953,7 +1027,11 @@ app.post('/api/auth/logout', (req, res) => {
   if (session && session.token !== SERVER_SESSION_SECRET) {
     activeSessions.delete(session.token);
   }
-  res.clearCookie('ai_session_token');
+  res.clearCookie('ai_session_token', {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: isProd,
+  });
   res.json({ ok: true, message: 'Logged out successfully' });
 });
 
@@ -1431,8 +1509,16 @@ app.post('/api/settings', requireAdmin, (req, res) => {
   res.json({ success: true, settings: store.settings });
 });
 
-// 10. System Diagnostics & Automated Acceptance Tests
-app.get('/api/diagnostics', (_req, res) => {
+// 10. Health, System Diagnostics & Automated Acceptance Tests
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get('/api/diagnostics', requireAuth, (_req, res) => {
   const store = loadStore();
   const hasKey = Boolean(process.env.GEMINI_API_KEY);
   const knowledgeCount = listKnowledgeFiles().length;
@@ -1463,7 +1549,7 @@ app.get('/api/diagnostics', (_req, res) => {
   });
 });
 
-app.get('/api/run-acceptance-tests', (_req, res) => {
+app.get('/api/run-acceptance-tests', requireAuth, (_req, res) => {
   const results: { test: string; status: 'PASS' | 'FAIL'; details: string }[] = [];
 
   // Check 1: Calculate 1250 * 24 + 3600 returns 33,600
@@ -2062,6 +2148,15 @@ app.get('/api/workspace-audit/logs', requireWorkspaceAuth, (req, res) => {
   }
 });
 
+// Global Express error handler - prevents stack trace leakage
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('Unhandled API Error:', err?.message || err);
+  const status = typeof err.status === 'number' && err.status >= 400 && err.status < 600 ? err.status : 500;
+  res.status(status).json({
+    error: status === 500 ? 'INTERNAL_SERVER_ERROR' : (err.code || 'REQUEST_FAILED'),
+    message: isProd ? 'An unexpected server error occurred.' : (err.message || 'Internal server error'),
+  });
+});
 
 // Setup Vite middleware or static serving
 async function startServer() {

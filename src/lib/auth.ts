@@ -32,52 +32,81 @@ function notifyAuth() {
 }
 
 /**
- * Ensures a valid session is active.
- * Checks /api/auth/session; if unauthenticated, bootstraps owner session seamlessly.
+ * Ensures a valid session is active via session cookie or Bearer token.
  */
 export async function ensureAuth(): Promise<{ authenticated: boolean; user?: any }> {
   try {
-    // 1. Try existing token
+    const headers: Record<string, string> = {};
     if (currentToken) {
-      const checkRes = await fetch('/api/auth/session', {
-        headers: { Authorization: `Bearer ${currentToken}` },
-      });
-      if (checkRes.ok) {
-        const data = await checkRes.json();
-        currentUser = { id: data.userId || 'owner', role: data.role || 'admin' };
-        notifyAuth();
-        return { authenticated: true, user: currentUser };
-      }
+      headers['Authorization'] = `Bearer ${currentToken}`;
     }
 
-    // 2. Auto-handshake for seamless personal assistant usage
-    const loginRes = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: 'personal-ai-master', userId: 'owner' }),
+    const checkRes = await fetch('/api/auth/session', {
+      credentials: 'include',
+      headers,
     });
 
-    if (loginRes.ok) {
-      const loginData = await loginRes.json();
-      if (loginData.token) {
-        setAuthToken(loginData.token);
-        currentUser = { id: loginData.user?.id || 'owner', role: loginData.user?.role || 'admin' };
-        notifyAuth();
-        return { authenticated: true, user: currentUser };
-      }
+    if (checkRes.ok) {
+      const data = await checkRes.json();
+      currentUser = { id: data.userId || 'owner', role: data.role || 'admin' };
+      notifyAuth();
+      return { authenticated: true, user: currentUser };
     }
 
     currentUser = null;
     notifyAuth();
     return { authenticated: false };
   } catch (err) {
-    console.warn('Auth handshake error:', err);
+    console.warn('Auth check error:', err);
+    currentUser = null;
+    notifyAuth();
     return { authenticated: false };
   }
 }
 
 /**
- * Authenticated API Fetch wrapper that always attaches Bearer token
+ * Explicit login using server-side credentials
+ */
+export async function login(password: string): Promise<{ success: boolean; error?: string; user?: any }> {
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ password }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.ok) {
+      currentUser = { id: data.user.id, role: data.user.role };
+      notifyAuth();
+      return { success: true, user: currentUser };
+    }
+
+    return { success: false, error: data.error || 'Authentication failed' };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+/**
+ * Invalidate server-side session and clear cookie
+ */
+export async function logout(): Promise<void> {
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+  } finally {
+    setAuthToken('');
+    currentUser = null;
+    notifyAuth();
+  }
+}
+
+/**
+ * Authenticated API Fetch wrapper that always includes credentials and optional Bearer token
  */
 export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers || {});
@@ -86,16 +115,9 @@ export async function apiFetch(input: RequestInfo | URL, init: RequestInit = {})
     headers.set('Authorization', `Bearer ${currentToken}`);
   }
 
-  let res = await fetch(input, { ...init, headers });
-
-  // If 401 Unauthorized, attempt refresh once
-  if (res.status === 401) {
-    const refreshed = await ensureAuth();
-    if (refreshed.authenticated && currentToken) {
-      headers.set('Authorization', `Bearer ${currentToken}`);
-      res = await fetch(input, { ...init, headers });
-    }
-  }
-
-  return res;
+  return fetch(input, {
+    credentials: 'include',
+    ...init,
+    headers,
+  });
 }

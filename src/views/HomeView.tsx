@@ -327,7 +327,7 @@ export const HomeView: React.FC<HomeViewProps> = ({ uiLang, onNavigate, onExecut
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#14171F] hover:bg-[#1A1F2B] border border-white/[0.08] text-xs font-mono text-slate-300 hover:text-white transition"
           >
             <ShieldCheck className="h-3.5 w-3.5 text-cyan-400" />
-            <span>{isMn ? '19/19 Тест PASS' : '19/19 Tests PASS'}</span>
+            <span>{isMn ? 'Аюулгүй байдлын тестүүд' : 'Security Tests'}</span>
           </button>
         </div>
       </div>

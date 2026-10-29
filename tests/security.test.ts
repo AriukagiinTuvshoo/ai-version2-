@@ -1,7 +1,7 @@
 import test, { describe, before, after } from 'node:test';
 import assert from 'node:assert';
 import http from 'node:http';
-import { app } from '../server.js';
+import { app, loginRateLimiter } from '../server.js';
 
 describe('Security & Authentication Regression Suite', () => {
   let server: http.Server;
@@ -18,6 +18,7 @@ describe('Security & Authentication Regression Suite', () => {
     process.env.ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
     process.env.FRIEND_PASSWORD = TEST_FRIEND_PASSWORD;
     delete process.env.WORKSPACE_AUTH_TOKEN;
+    loginRateLimiter.clear();
 
     server = http.createServer(app);
     await new Promise<void>((resolve) => {
@@ -40,6 +41,7 @@ describe('Security & Authentication Regression Suite', () => {
     if (originalAuthToken !== undefined) process.env.WORKSPACE_AUTH_TOKEN = originalAuthToken;
     else delete process.env.WORKSPACE_AUTH_TOKEN;
 
+    loginRateLimiter.clear();
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
@@ -64,7 +66,7 @@ describe('Security & Authentication Regression Suite', () => {
     return { status: res.status, headers: res.headers, text, json, setCookie };
   }
 
-  // 1. Unauthenticated request to private routes returns 401
+  // 1. Unauthenticated requests to private routes return 401
   test('1. Unauthenticated requests to private routes return 401 Unauthorized', async () => {
     const routesToTest = [
       { method: 'GET', path: '/api/store' },
@@ -74,6 +76,10 @@ describe('Security & Authentication Regression Suite', () => {
       { method: 'GET', path: '/api/activity' },
       { method: 'GET', path: '/api/dashboard/overview' },
       { method: 'GET', path: '/api/auth/session' },
+      { method: 'GET', path: '/api/diagnostics' },
+      { method: 'GET', path: '/api/run-acceptance-tests' },
+      { method: 'GET', path: '/api/memory/knowledge-graph-v2' },
+      { method: 'POST', path: '/api/agent/run', body: JSON.stringify({ user_text: 'hello' }) },
       { method: 'POST', path: '/api/workspace/create', body: JSON.stringify({ taskId: 'test' }) },
       { method: 'GET', path: '/api/workspace/test-task' },
       { method: 'GET', path: '/api/workspace/test-task/diff' },
@@ -90,8 +96,64 @@ describe('Security & Authentication Regression Suite', () => {
     }
   });
 
-  // 2. Non-owner request to privileged route returns 403
-  test('2. Non-owner (role: user) request to privileged routes returns 403 Forbidden', async () => {
+  // 2. Public healthcheck returns 200 without authentication
+  test('2. Public /api/health endpoint returns 200 without authentication', async () => {
+    const res = await request('/api/health');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.json?.status, 'ok');
+    assert.strictEqual(typeof res.json?.uptime, 'number');
+    assert.ok(res.json?.timestamp);
+  });
+
+  // 3. Security headers are present on all responses
+  test('3. Security headers (X-Content-Type-Options, X-Frame-Options) are enforced', async () => {
+    const res = await request('/api/health');
+    assert.strictEqual(res.headers.get('x-content-type-options'), 'nosniff');
+    assert.strictEqual(res.headers.get('x-frame-options'), 'SAMEORIGIN');
+    assert.strictEqual(res.headers.get('referrer-policy'), 'strict-origin-when-cross-origin');
+  });
+
+  // 4. Rate limiting on /api/auth/login locks out after 5 consecutive failures
+  test('4. Rate limiting locks out after 5 failed login attempts', async () => {
+    loginRateLimiter.clear();
+    const testIpHeader = { 'X-Forwarded-For': '198.51.100.42' };
+
+    // 4 failed attempts should return 401
+    for (let i = 1; i <= 4; i++) {
+      const failRes = await request('/api/auth/login', {
+        method: 'POST',
+        headers: testIpHeader,
+        body: JSON.stringify({ password: `wrong-pass-${i}` }),
+      });
+      assert.strictEqual(failRes.status, 401, `Attempt ${i} should return 401`);
+      assert.strictEqual(failRes.json?.code, 'INVALID_CREDENTIALS');
+    }
+
+    // 5th failed attempt triggers 429
+    const lockRes = await request('/api/auth/login', {
+      method: 'POST',
+      headers: testIpHeader,
+      body: JSON.stringify({ password: 'wrong-pass-5' }),
+    });
+    assert.strictEqual(lockRes.status, 429, '5th failure should return 429 Too Many Requests');
+    assert.strictEqual(lockRes.json?.code, 'RATE_LIMITED');
+    assert.ok(lockRes.json?.error.includes('RATE_LIMITED'));
+
+    // 6th attempt (even with valid password) should still be rejected with 429 while locked
+    const lockedValidRes = await request('/api/auth/login', {
+      method: 'POST',
+      headers: testIpHeader,
+      body: JSON.stringify({ password: TEST_ADMIN_PASSWORD }),
+    });
+    assert.strictEqual(lockedValidRes.status, 429, 'Subsequent attempts while locked should return 429');
+
+    // Clean up rate limiter
+    loginRateLimiter.clear();
+  });
+
+  // 5. Non-owner request to privileged route returns 403
+  test('5. Non-owner (role: user) request to privileged routes returns 403 Forbidden', async () => {
+    loginRateLimiter.clear();
     // Login as friend
     const loginRes = await request('/api/auth/login', {
       method: 'POST',
@@ -129,8 +191,8 @@ describe('Security & Authentication Regression Suite', () => {
     }
   });
 
-  // 3. If ADMIN_PASSWORD is unset, server refuses login with error
-  test('3. Refuses login with 503 error when ADMIN_PASSWORD is not set', async () => {
+  // 6. If ADMIN_PASSWORD is unset, server refuses login with error
+  test('6. Refuses login with 503 error when ADMIN_PASSWORD is not set', async () => {
     delete process.env.ADMIN_PASSWORD;
 
     const res = await request('/api/auth/login', {
@@ -146,8 +208,9 @@ describe('Security & Authentication Regression Suite', () => {
     process.env.ADMIN_PASSWORD = TEST_ADMIN_PASSWORD;
   });
 
-  // 4. If login succeeds, no token is printed in response body
-  test('4. Successful login returns no token in response body and sets httpOnly cookie', async () => {
+  // 7. Successful login returns no token in response body and sets httpOnly cookie
+  test('7. Successful login returns no token in response body and sets httpOnly cookie', async () => {
+    loginRateLimiter.clear();
     const res = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({ password: TEST_ADMIN_PASSWORD }),
@@ -167,6 +230,7 @@ describe('Security & Authentication Regression Suite', () => {
     assert.ok(res.setCookie, 'set-cookie header must be present');
     assert.ok(res.setCookie.includes('ai_session_token='), 'ai_session_token cookie must be set');
     assert.ok(res.setCookie.toLowerCase().includes('httponly'), 'cookie must be HttpOnly');
+    assert.ok(res.setCookie.toLowerCase().includes('samesite=lax'), 'cookie must be SameSite=Lax');
 
     // Verify subsequent authenticated call with cookie works and leaks no token
     const cookieHeader = res.setCookie.split(';')[0];
@@ -179,8 +243,42 @@ describe('Security & Authentication Regression Suite', () => {
     assert.strictEqual(sessionRes.json?.token, undefined, 'Token must not be in /api/auth/session body');
   });
 
-  // 5. Client cannot forge role or identity via request body
-  test('5. Rejects client forgery of userId or role in request body', async () => {
+  // 8. Logout invalidates server session and clears cookie
+  test('8. Logout endpoint invalidates the server session and clears cookie', async () => {
+    loginRateLimiter.clear();
+    // Login
+    const loginRes = await request('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ password: TEST_ADMIN_PASSWORD }),
+    });
+    assert.strictEqual(loginRes.status, 200);
+    const cookieHeader = loginRes.setCookie!.split(';')[0];
+
+    // Verify authenticated
+    const check1 = await request('/api/auth/session', {
+      headers: { Cookie: cookieHeader },
+    });
+    assert.strictEqual(check1.status, 200);
+
+    // Call logout
+    const logoutRes = await request('/api/auth/logout', {
+      method: 'POST',
+      headers: { Cookie: cookieHeader },
+    });
+    assert.strictEqual(logoutRes.status, 200);
+    assert.strictEqual(logoutRes.json?.ok, true);
+    assert.ok(logoutRes.setCookie, 'Logout should send set-cookie to clear token');
+
+    // Verify session is invalidated on server
+    const checkAfter = await request('/api/auth/session', {
+      headers: { Cookie: cookieHeader },
+    });
+    assert.strictEqual(checkAfter.status, 401, 'Session must return 401 after logout');
+  });
+
+  // 9. Client cannot forge role or identity via request body
+  test('9. Rejects client forgery of userId or role in request body', async () => {
+    loginRateLimiter.clear();
     const forgedRes = await request('/api/auth/login', {
       method: 'POST',
       body: JSON.stringify({
